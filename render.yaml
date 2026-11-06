@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: pipeline-doctor
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /saude
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: GEMINI_API_KEY
+        sync: false # definida manualmente no painel do Render, nunca no repo
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
