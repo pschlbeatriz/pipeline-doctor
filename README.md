@@ -22,6 +22,7 @@ Cole o log de uma falha de CI/CD (GitHub Actions, Docker, pytest, npm...) e rece
 |---|---|---|
 | GET | `/saude` | Health check |
 | POST | `/diagnosticar` | `{"log": "..."}` → diagnóstico estruturado + `segredos_removidos` |
+| GET | `/historico` | Últimos 10 diagnósticos (SQLite; só resumo, nunca o log) |
 
 Docs interativas em `/docs`.
 
@@ -37,6 +38,13 @@ uvicorn app.main:app --reload
 
 Abra http://127.0.0.1:8000 (o backend serve o frontend).
 
+## Docker
+
+```bash
+docker build -t pipeline-doctor .
+docker run -p 8000:8000 -e GEMINI_API_KEY=sua_chave pipeline-doctor
+```
+
 ## Testes
 
 ```bash
@@ -48,16 +56,17 @@ A chamada ao Gemini é simulada (mock); nenhum teste usa rede nem chave. O build
 ## Estrutura
 
 ```
-backend/   FastAPI, redator, integração com IA, testes
+backend/   FastAPI, redator, integração com IA, histórico SQLite, testes
 frontend/  HTML/JS puro (sem build)
 .github/   pipeline de CI
+Dockerfile  imagem da aplicação (validada no CI)
 render.yaml  deploy no Render
 ```
 
 ## Ideias futuras
 
 - GitHub App que comenta o diagnóstico direto no PR que falhou
-- Histórico e detecção de falhas recorrentes (flaky tests)
+- Detecção de falhas recorrentes (flaky tests) sobre o histórico, com banco persistente (Postgres)
 - Redator com lista de padrões configurável
 
 Veja [DECISOES.md](DECISOES.md) para as escolhas técnicas.
