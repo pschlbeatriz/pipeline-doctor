@@ -46,6 +46,14 @@ def test_ia_indisponivel_503(client, monkeypatch):
     assert r.status_code == 503
 
 
+def test_historico_guarda_resumo_sem_log(client, ia_falsa):
+    assert client.get("/historico").json() == []
+    client.post("/diagnosticar", json={"log": LOG + " senha=hunter2"})
+    itens = client.get("/historico").json()
+    assert len(itens) == 1 and itens[0]["categoria"] == "dependencia"
+    assert "hunter2" not in str(itens) and "express" not in str(itens)
+
+
 def test_frontend_servido(client):
     r = client.get("/")
     assert r.status_code == 200 and "Pipeline Doctor" in r.text

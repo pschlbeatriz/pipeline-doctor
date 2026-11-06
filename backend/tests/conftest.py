@@ -16,8 +16,9 @@ FALSO = Diagnostico(
 
 
 @pytest.fixture(autouse=True)
-def _limpa_estado(monkeypatch):
+def _limpa_estado(monkeypatch, tmp_path):
     main._acessos.clear()
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "teste.db"))
     monkeypatch.setenv("RATE_LIMIT_PER_MIN", "10")
 
 

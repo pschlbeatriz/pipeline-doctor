@@ -32,6 +32,7 @@
     <span class="aviso" id="st"></span>
   </div>
   <div id="out"></div>
+  <div id="hist"></div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -73,13 +74,25 @@ function render(d) {
   }
 }
 
+async function carregarHistorico() {
+  try {
+    const itens = await (await fetch('/historico')).json();
+    const h = $('hist'); h.replaceChildren();
+    if (!itens.length) return;
+    const lista = document.createElement('div');
+    itens.forEach(i => lista.append(txt(`${i.criado_em} · ${i.categoria} · ${i.severidade} · ${i.causa}`)));
+    h.append(card('Últimos diagnósticos (públicos, sem o log)', lista));
+  } catch (_) { /* historico e opcional */ }
+}
+carregarHistorico();
+
 $('go').onclick = async () => {
   const btn = $('go'); btn.disabled = true; $('st').textContent = 'Analisando...'; $('out').replaceChildren();
   try {
     const r = await fetch('/diagnosticar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({log: $('log').value})});
     const j = await r.json();
     if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : 'Log inválido (mínimo 20 e máximo 20.000 caracteres).');
-    render(j);
+    render(j); carregarHistorico();
   } catch (e) {
     const d = card('Erro', txt(e.message)); d.classList.add('erro'); $('out').append(d);
   } finally { btn.disabled = false; $('st').textContent = ''; }

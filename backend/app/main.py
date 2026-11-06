@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 
-from . import ia
+from . import historico, ia
 from .redator import redigir
 from .schemas import PedidoDiagnostico, RespostaDiagnostico
 
@@ -43,7 +43,13 @@ def diagnosticar(pedido: PedidoDiagnostico, request: Request):
         diag = ia.diagnosticar(log_limpo)
     except ia.IAIndisponivel as e:
         raise HTTPException(503, str(e))
+    historico.salvar(diag)
     return RespostaDiagnostico(diagnostico=diag, segredos_removidos=removidos)
+
+
+@app.get("/historico")
+def listar_historico():
+    return historico.recentes()
 
 
 # Frontend servido pelo mesmo servico: 1 URL publica, sem CORS. Montado por ultimo.
