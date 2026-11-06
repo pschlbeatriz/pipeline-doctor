@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pipeline Doctor</title>
+<style>
+  :root{--bg:#0f1419;--card:#1a212b;--tx:#e6edf3;--mut:#8b98a5;--ac:#3fb950;--bd:#2b3544}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,sans-serif}
+  main{max-width:820px;margin:0 auto;padding:24px 16px}
+  h1{margin:0 0 4px} .sub{color:var(--mut);margin:0 0 20px}
+  textarea{width:100%;height:220px;background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:12px;font:13px/1.4 ui-monospace,Consolas,monospace;resize:vertical}
+  .row{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;align-items:center}
+  button{background:var(--ac);color:#04210b;border:0;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer}
+  button.sec{background:transparent;color:var(--tx);border:1px solid var(--bd)} button:disabled{opacity:.5;cursor:wait}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin:12px 0}
+  .card h3{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+  .tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;margin-right:6px;border:1px solid var(--bd)}
+  .baixa{color:#3fb950}.media{color:#d29922}.alta{color:#f0883e}.critica{color:#f85149}
+  code{display:block;background:#0b0f14;padding:6px 10px;border-radius:6px;margin:4px 0;font:13px ui-monospace,Consolas,monospace;overflow-x:auto}
+  .erro{border-color:#f85149;color:#f85149} .aviso{color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>🩺 Pipeline Doctor</h1>
+  <p class="sub">Cole o log de uma falha de CI/CD e receba um diagnóstico de SRE em segundos. Segredos são removidos antes de chegar à IA.</p>
+  <textarea id="log" placeholder="Cole aqui o log do GitHub Actions, Docker build, pytest, npm..."></textarea>
+  <div class="row">
+    <button id="go">Diagnosticar</button>
+    <button id="ex" class="sec" type="button">Usar exemplo</button>
+    <span class="aviso" id="st"></span>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const EXEMPLO = `Run pytest
+============================= test session starts ==============================
+ERROR collecting tests/test_api.py
+ImportError while importing test module '/home/runner/work/loja/tests/test_api.py'.
+E   ModuleNotFoundError: No module named 'httpx'
+Error: Process completed with exit code 2.
+DATABASE_PASSWORD=hunter2
+Authorization: Bearer abcdef1234567890abcdef`;
+$('ex').onclick = () => $('log').value = EXEMPLO;
+
+function card(titulo, conteudo) {
+  const c = document.createElement('div'); c.className = 'card';
+  const h = document.createElement('h3'); h.textContent = titulo; c.append(h);
+  c.append(conteudo); return c;
+}
+const txt = s => { const p = document.createElement('div'); p.textContent = s; return p; };
+
+function render(d) {
+  const out = $('out'); out.replaceChildren();
+  const g = d.diagnostico;
+  const tags = document.createElement('div');
+  for (const [t, cls] of [[g.categoria, ''], ['severidade: ' + g.severidade, g.severidade],
+      ['confiança: ' + Math.round(g.confianca * 100) + '%', '']]) {
+    const s = document.createElement('span'); s.className = 'tag ' + cls; s.textContent = t; tags.append(s);
+  }
+  out.append(card('Resumo', tags));
+  out.append(card('Causa provável', txt(g.causa_provavel)));
+  out.append(card('Correção sugerida', txt(g.correcao_sugerida)));
+  const cmds = document.createElement('div');
+  g.comandos_verificar.forEach(c => { const e = document.createElement('code'); e.textContent = c; cmds.append(e); });
+  out.append(card('Comandos para verificar', cmds));
+  out.append(card('Rascunho de post-mortem', txt(g.resumo_postmortem)));
+  if (d.segredos_removidos) {
+    const a = txt('🔒 ' + d.segredos_removidos + ' segredo(s) removido(s) antes de enviar à IA.');
+    a.className = 'aviso'; out.append(a);
+  }
+}
+
+$('go').onclick = async () => {
+  const btn = $('go'); btn.disabled = true; $('st').textContent = 'Analisando...'; $('out').replaceChildren();
+  try {
+    const r = await fetch('/diagnosticar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({log: $('log').value})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : 'Log inválido (mínimo 20 e máximo 20.000 caracteres).');
+    render(j);
+  } catch (e) {
+    const d = card('Erro', txt(e.message)); d.classList.add('erro'); $('out').append(d);
+  } finally { btn.disabled = false; $('st').textContent = ''; }
+};
+</script>
+</body>
+</html>
