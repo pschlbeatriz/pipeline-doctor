@@ -1,33 +1,31 @@
-# Decisões técnicas
+# Decisões
 
-> RASCUNHO: reescreva com suas palavras e experiências reais antes de entregar. Você precisa saber explicar cada linha.
+## Por que esse tema
 
-## Por que este tema
+Escolhi fazer um sistema que lê o log de uma falha de CI/CD e explica o que deu errado. Logs de erro são longos, confusos e quase sempre aparecem na hora errada, e entender o que está escrito neles é um bom trabalho para uma IA. Também achei que combinava com a trilha: é um projeto de IA feito para quem trabalha com DevOps.
 
-Quero trabalhar com DevOps, e quem faz pipeline convive com logs de erro enormes e difíceis de ler. Uma IA é boa em ler texto bagunçado e propor hipóteses, então o Pipeline Doctor une as duas coisas da trilha: DevOps e IA Generativa.
+O ponto que mais me preocupou foi a segurança. Log de pipeline costuma ter token e senha no meio, e mandar isso cru para uma API externa seria vazar segredo. Por isso o sistema passa o log por um filtro que troca esses trechos por `[REDACTED]` antes de qualquer chamada à IA. O log também é tratado como texto não confiável, para ele não conseguir dar ordens ao modelo, e a resposta do Gemini precisa seguir um formato fixo ou é descartada.
 
 ## Stack e por quê
 
-- **Python + FastAPI:** poucas linhas para uma API com validação automática (Pydantic) e documentação em `/docs`. O mesmo Pydantic define o schema que a IA precisa respeitar.
-- **Gemini (google-genai):** tem camada gratuita e suporta saída estruturada (JSON com schema), o que evita parsear texto livre.
-- **Frontend HTML/JS puro, servido pelo próprio backend:** uma única URL pública, sem CORS, sem etapa de build. Menos peças para quebrar.
-- **pytest + pytest-cov:** padrão do ecossistema Python; o limite de 70% está no `pytest.ini`, então o CI falha sozinho se a cobertura cair.
-- **GitHub Actions + Render:** CI gratuito integrado ao repositório e deploy automático a cada push na `main`.
-
-## Segurança
-
-Logs de CI frequentemente contêm segredos. Mandá-los crus para uma API externa seria um vazamento, então criei o redator, que limpa o texto antes da chamada. Também tratei o log como entrada não confiável (prompt injection) e validei a resposta da IA contra um schema.
+- **Python com FastAPI.** É o que me deixa escrever menos código. O Pydantic valida a entrada do usuário e também o formato da resposta da IA.
+- **Gemini.** Tem plano gratuito e aceita pedir a resposta em JSON com um schema, então não preciso interpretar texto solto.
+- **Frontend em HTML e JavaScript puros, servido pelo próprio backend.** Fica uma URL só, sem CORS e sem etapa de build.
+- **SQLite** para o histórico dos últimos diagnósticos. Guarda só o resumo, nunca o log, porque a página é pública.
+- **GitHub Actions e Render.** O CI roda os testes e o build do Docker a cada push, e o Render publica sozinho a partir do GitHub.
 
 ## Maior dificuldade
 
-(Escreva a sua. Exemplos possíveis: instalar dependências no Python 3.14 sem wheels, ajustar as regex do redator para não remover texto demais, configurar o deploy.)
+A parte que mais deu trabalho foi a integração com o Gemini, porque os testes passavam e a chamada real não funcionava. Com a IA simulada tudo ficava verde, mas na primeira chamada de verdade apareceu um erro de "client has been closed". O cliente da biblioteca estava sendo descartado antes de a resposta chegar, e a solução foi guardá-lo numa variável.
+
+Depois descobri que o modelo que eu tinha escolhido, o `gemini-2.5-flash`, não estava mais disponível para contas novas. O modelo seguinte demorava tanto que estourava o tempo, então coloquei um timeout de 20 segundos. Já em produção, o Gemini devolveu erro 503 por excesso de demanda na minha primeira chamada. Isso me fez criar uma lista de modelos reserva: se um falha, o sistema tenta o próximo.
+
+Também perdi tempo com o Python 3.14 da minha máquina, que não tinha pacotes prontos para as versões que eu tinha fixado. Soltei as versões e deixei o CI no Python 3.12.
 
 ## O que aprendi
 
-- Simular a IA com mock deixa os testes rápidos, grátis e determinísticos; o código de integração fica isolado numa função pequena (`_chamar_gemini`).
-- Validar a saída da IA é tão importante quanto validar a entrada do usuário.
-- Cobertura alta não basta: os testes mais valiosos foram os que provam que o segredo nunca chega à IA.
+Mock é ótimo para ter teste rápido, mas não substitui chamar o serviço de verdade pelo menos uma vez. Os três problemas acima só apareceram assim. Aprendi também que serviço externo falha, e que o sistema precisa ter plano para isso, com timeout, fallback e uma mensagem de erro que faça sentido para o usuário.
 
-## O que faria diferente
+## O que eu faria diferente
 
-Persistiria o histórico de diagnósticos num banco para detectar falhas recorrentes, trocaria o rate limit em memória por Redis e criaria um GitHub App para comentar o diagnóstico direto no pull request.
+Testaria a integração real com a IA no primeiro dia, e não depois de terminar tudo. Trocaria o SQLite por um Postgres, já que o disco do plano gratuito do Render é apagado a cada reinício e o histórico some. E criaria um GitHub App para comentar o diagnóstico direto no pull request que falhou, que é onde a pessoa realmente precisa dele.
