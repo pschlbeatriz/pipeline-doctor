@@ -20,8 +20,11 @@ def _chamar_gemini(prompt: str) -> str:
     chave = os.getenv("GEMINI_API_KEY")
     if not chave:
         raise IAIndisponivel("GEMINI_API_KEY nao configurada")
-    resp = genai.Client(api_key=chave).models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    # Cliente em variavel: se for descartado no meio da chamada, o httpx interno fecha ("client has been closed").
+    # timeout de 30s (ms): sem isso a requisicao do usuario pode ficar pendurada indefinidamente
+    cliente = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=30_000))
+    resp = cliente.models.generate_content(
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=INSTRUCAO,
