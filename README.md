@@ -4,7 +4,7 @@
 
 Cole o log de uma falha de CI/CD (GitHub Actions, Docker, pytest, npm...) e receba um diagnóstico de SRE gerado por IA Generativa (Gemini): causa provável, severidade, comandos para verificar, correção sugerida e rascunho de post-mortem.
 
-**Aplicação online:** https://SEU-APP.onrender.com
+**Aplicação online:** https://pipeline-doctor-ogp9.onrender.com
 
 ## O diferencial: segurança de ponta a ponta
 

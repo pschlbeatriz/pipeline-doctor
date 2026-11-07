@@ -16,15 +16,25 @@ class IAIndisponivel(Exception):
     pass
 
 
-def _chamar_gemini(prompt: str) -> str:
+# Modelos tentados em ordem: o Gemini devolve 503/504 em picos de demanda, entao ha fallback.
+RESERVAS = ["gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.1-flash-lite"]
+
+
+def _modelos() -> list[str]:
+    """GEMINI_MODEL (um ou varios, separados por virgula) primeiro; reservas depois, sem repetir."""
+    pedidos = [m.strip() for m in os.getenv("GEMINI_MODEL", "").split(",") if m.strip()]
+    return list(dict.fromkeys(pedidos + RESERVAS))
+
+
+def _chamar_gemini(prompt: str, modelo: str) -> str:
     chave = os.getenv("GEMINI_API_KEY")
     if not chave:
         raise IAIndisponivel("GEMINI_API_KEY nao configurada")
     # Cliente em variavel: se for descartado no meio da chamada, o httpx interno fecha ("client has been closed").
-    # timeout de 30s (ms): sem isso a requisicao do usuario pode ficar pendurada indefinidamente
-    cliente = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=30_000))
+    # timeout de 20s (ms): sem isso a requisicao do usuario pode ficar pendurada indefinidamente
+    cliente = genai.Client(api_key=chave, http_options=types.HttpOptions(timeout=20_000))
     resp = cliente.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+        model=modelo,
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=INSTRUCAO,
@@ -38,10 +48,13 @@ def _chamar_gemini(prompt: str) -> str:
 
 def diagnosticar(log: str) -> Diagnostico:
     log = log.replace("</log>", "")  # impede o log de "fechar" o delimitador
-    try:
-        bruto = _chamar_gemini(f"<log>\n{log}\n</log>")
-        return Diagnostico.model_validate_json(bruto)
-    except IAIndisponivel:
-        raise
-    except Exception as e:  # rede, cota, JSON invalido, schema violado
-        raise IAIndisponivel(f"falha ao consultar a IA: {type(e).__name__}") from e
+    prompt = f"<log>\n{log}\n</log>"
+    erro = None
+    for modelo in _modelos():
+        try:
+            return Diagnostico.model_validate_json(_chamar_gemini(prompt, modelo))
+        except IAIndisponivel:
+            raise
+        except Exception as e:  # sobrecarga, timeout, cota, JSON invalido, schema violado
+            erro = e
+    raise IAIndisponivel(f"falha ao consultar a IA: {type(erro).__name__}") from erro
