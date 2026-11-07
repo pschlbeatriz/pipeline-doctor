@@ -1,6 +1,6 @@
 # 🩺 Pipeline Doctor
 
-[![CI](https://github.com/SEU_USUARIO/SEU_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/SEU_USUARIO/SEU_REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/pschlbeatriz/pipeline-doctor/actions/workflows/ci.yml/badge.svg)](https://github.com/pschlbeatriz/pipeline-doctor/actions/workflows/ci.yml)
 
 Cole o log de uma falha de CI/CD (GitHub Actions, Docker, pytest, npm...) e receba um diagnóstico de SRE gerado por IA Generativa (Gemini): causa provável, severidade, comandos para verificar, correção sugerida e rascunho de post-mortem.
 
